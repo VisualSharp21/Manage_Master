@@ -17,6 +17,15 @@ class Estatisticas:
             api_client: Instância do cliente da API
         """
         self.api = api_client
+
+    @staticmethod
+    def _parse_data_iso(data_str: str):
+        if not data_str:
+            return None
+        try:
+            return datetime.fromisoformat(data_str.replace('Z', '+00:00')).replace(tzinfo=None)
+        except ValueError:
+            return None
     
     def calcular_receitas_mensais(self, meses: int = 12) -> Dict[str, Decimal]:
         """
@@ -35,47 +44,34 @@ class Estatisticas:
         data_limite = datetime.now() - timedelta(days=meses * 30)
         
         for venda in vendas:
-            if 'data' in venda:
-                try:
-                    # Parse da data (formato ISO do Spring Boot)
-                    data_venda_str = venda['data']
-                    # Remover 'Z' e ajustar formato se necessário
-                    if 'T' in data_venda_str:
-                        data_venda = datetime.fromisoformat(data_venda_str.replace('Z', '+00:00'))
-                    else:
-                        # Tentar formato apenas data
-                        data_venda = datetime.fromisoformat(data_venda_str)
-                    
-                    if data_venda >= data_limite:
-                        mes_ano = data_venda.strftime('%Y-%m')
-                        
-                        # Tentar obter valor total da venda
-                        # Nota: O DTO atual não retorna valorTotal, então vamos usar uma estimativa
-                        # baseada no total geral dividido pelo número de vendas no período
-                        # Para uma solução completa, seria necessário adicionar valorTotal ao DTO
-                        venda_detalhes = self.api.buscar_venda(venda['id'])
-                        if venda_detalhes:
-                            # Tentar diferentes campos possíveis
-                            valor = None
-                            for campo in ['valorTotal', 'total', 'valor']:
-                                if campo in venda_detalhes:
-                                    valor = Decimal(str(venda_detalhes[campo]))
-                                    break
-                            
-                            # Se não encontrou valor, usar média estimada
-                            if valor is None:
-                                # Calcular média baseada no total de vendas
-                                total_vendas = self.api.total_vendas()
-                                num_vendas_periodo = len([v for v in vendas if 'data' in v])
-                                if num_vendas_periodo > 0:
-                                    valor = total_vendas / num_vendas_periodo
-                                else:
-                                    valor = Decimal('0')
-                            
-                            receitas[mes_ano] += valor
-                except (ValueError, KeyError, AttributeError) as e:
-                    print(f"Erro ao processar venda {venda.get('id')}: {e}")
+            try:
+                data_venda = self._parse_data_iso(venda.get('data') or venda.get('dataTransacao'))
+                if not data_venda or data_venda < data_limite:
                     continue
+
+                mes_ano = data_venda.strftime('%Y-%m')
+                valor = None
+
+                for campo in ['valorTotal', 'total', 'valor']:
+                    if venda.get(campo) is not None:
+                        valor = Decimal(str(venda[campo]))
+                        break
+
+                if valor is None and venda.get('id') is not None:
+                    venda_detalhes = self.api.buscar_venda(venda['id'])
+                    if venda_detalhes:
+                        for campo in ['valorTotal', 'total', 'valor']:
+                            if venda_detalhes.get(campo) is not None:
+                                valor = Decimal(str(venda_detalhes[campo]))
+                                break
+
+                if valor is None:
+                    valor = Decimal('0')
+
+                receitas[mes_ano] += valor
+            except (ValueError, KeyError, AttributeError) as e:
+                print(f"Erro ao processar venda {venda.get('id')}: {e}")
+                continue
         
         return dict(receitas)
     
@@ -101,9 +97,9 @@ class Estatisticas:
                     # Tentar diferentes formatos de data
                     data_str = compra.get('data') or compra.get('dataTransacao')
                     if data_str:
-                        data_compra = datetime.fromisoformat(data_str.replace('Z', '+00:00'))
+                        data_compra = self._parse_data_iso(data_str)
                         
-                        if data_compra >= data_limite:
+                        if data_compra and data_compra >= data_limite:
                             mes_ano = data_compra.strftime('%Y-%m')
                             
                             # Usar valorTotal da compra
@@ -169,18 +165,12 @@ class Estatisticas:
         """
         Identifica os produtos mais vendidos
         
-        Nota: Como o DTO atual não retorna os itens da venda, este método
-        retorna uma lista vazia. Para funcionar completamente, seria necessário
-        adicionar os itens ao VendaResponseDTO ou criar um endpoint específico.
-        
         Args:
             limite: Número máximo de produtos para retornar
             
         Returns:
             Lista de dicionários com informações do produto e quantidade vendida
         """
-        # TODO: Implementar quando o DTO incluir itens ou criar endpoint específico
-        # Por enquanto, retornar lista vazia para não quebrar a aplicação
         vendas = self.api.listar_vendas()
         produtos_vendidos = defaultdict(int)
         produtos_info = {}
@@ -192,25 +182,28 @@ class Estatisticas:
         
         # Tentar obter itens das vendas
         for venda in vendas:
-            venda_detalhes = self.api.buscar_venda(venda['id'])
-            if venda_detalhes:
-                # Tentar diferentes estruturas possíveis
-                itens = venda_detalhes.get('itens') or venda_detalhes.get('items') or []
-                for item in itens:
-                    produto_id = None
-                    quantidade = 0
-                    
-                    # Tentar diferentes formatos de item
-                    if isinstance(item, dict):
-                        produto_id = item.get('produtoId') or item.get('produto_id')
-                        if not produto_id and 'produto' in item:
-                            produto_obj = item['produto']
-                            if isinstance(produto_obj, dict):
-                                produto_id = produto_obj.get('id')
-                        quantidade = item.get('quantidade', 0)
-                    
-                    if produto_id and quantidade:
-                        produtos_vendidos[produto_id] += quantidade
+            venda_detalhes = venda
+            itens = venda_detalhes.get('itens') or venda_detalhes.get('items') or []
+
+            if not itens and venda.get('id') is not None:
+                detalhada = self.api.buscar_venda(venda['id'])
+                if detalhada:
+                    itens = detalhada.get('itens') or detalhada.get('items') or []
+
+            for item in itens:
+                produto_id = None
+                quantidade = 0
+
+                if isinstance(item, dict):
+                    produto_id = item.get('produtoId') or item.get('produto_id')
+                    if not produto_id and 'produto' in item:
+                        produto_obj = item['produto']
+                        if isinstance(produto_obj, dict):
+                            produto_id = produto_obj.get('id')
+                    quantidade = item.get('quantidade', 0)
+
+                if produto_id and quantidade:
+                    produtos_vendidos[produto_id] += quantidade
         
         # Se não encontrou nenhum produto vendido, retornar lista vazia
         if not produtos_vendidos:

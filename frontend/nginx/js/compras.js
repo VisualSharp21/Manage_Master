@@ -38,8 +38,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 inputProduto.value = produto.nome;
                 inputProduto.dataset.idReal = produto.id;
                 
-                // IMPORTANTE: Captura o fornecedor do produto para o Java não dar erro de "null"
-                inputProduto.dataset.fornecedorId = produto.fornecedorId || (produto.fornecedor ? produto.fornecedor.id : 1);
+                // Captura o fornecedor do produto para montar o payload da venda
+                inputProduto.dataset.fornecedorId = produto.fornecedorId || "";
 
                 // Lógica de Preços
                 precoOriginalDoBanco = parseFloat(produto.preco);
@@ -86,6 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const precoVendaManual = parseFloat(inputPreco.value);
 
         if (!idReal) return alert("Pesquise um produto primeiro.");
+        if (!fornecedorId) return alert("Produto sem fornecedor vinculado. Atualize o cadastro do produto.");
         if (isNaN(qtd) || qtd <= 0) return alert("Quantidade inválida.");
         if (isNaN(precoVendaManual) || precoVendaManual < 0) return alert("Preço inválido.");
 

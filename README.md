@@ -1,5 +1,5 @@
-# 📊 Manage Master - Projetos 2
-#### O software criado para disciplina de projetos de engenharia II feito pela equipe gnosis com objetivo de ajudar microempreendedores a fazer uma melhor gestão financeira e de estoque usando ferramentas como Java(Spring boot), python, html, css, JavaScript, SQL, MySQL e Docker
+#  Manage Master - Projetos 2
+O software criado para disciplina de projetos de engenharia II feito pela equipe gnosis com objetivo de ajudar microempreendedores a fazer uma melhor gestão financeira e de estoque usando ferramentas como Java(Spring boot), python, html, css, JavaScript, SQL, MySQL e Docker
 
 ## 📂Estrutura de Arquivos:
 ```
@@ -22,7 +22,7 @@
 ├── 📚 External Libraries       # Bibliotecas externas
 └── 📝 Scratches and Consoles   # Arquivos temporários e consoles
 ```
-## ⚙️Instrucoes para instalacao:
+# ⚙️Instrucoes para instalacao:
 ```bash
 # Navegar para o backend
 cd "Manager Master/sigfebackend"

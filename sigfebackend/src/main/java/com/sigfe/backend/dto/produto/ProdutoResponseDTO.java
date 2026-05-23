@@ -1,5 +1,7 @@
 package com.sigfe.backend.dto.produto;
 
+import com.sigfe.backend.model.Produto;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
@@ -11,12 +13,11 @@ public record ProdutoResponseDTO(
         int quantidade,
         LocalDate validade,
         String nomeCategoria,
-        String nomeFornecedor, // Este campo DEVE estar aqui no cabeçalho
+        Long fornecedorId,
+        String nomeFornecedor,
         boolean vencido
 ) {
-    // Construtor auxiliar: Transforma a Entidade do banco no Pacote (DTO) de saída
-    public ProdutoResponseDTO(com.sigfe.backend.model.Produto produto) {
-        // A regra do Record: Chamar o construtor principal (canônico) com 'this'
+    public ProdutoResponseDTO(Produto produto) {
         this(
                 produto.getId(),
                 produto.getNome(),
@@ -25,6 +26,7 @@ public record ProdutoResponseDTO(
                 produto.getQuantidade(),
                 produto.getValidade(),
                 produto.getCategoria() != null ? produto.getCategoria().getNome() : "Sem Categoria",
+                produto.getFornecedor() != null ? produto.getFornecedor().getId() : null,
                 produto.getFornecedor() != null ? produto.getFornecedor().getNome() : "Sem Fornecedor",
                 produto.estaVencido()
         );
